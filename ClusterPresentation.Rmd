@@ -1,0 +1,352 @@
+---
+title: "Categorical Analysis and Clustering"
+subtitle: "Case Study: Expatriated U.S. Veterans"  
+author: 
+  - "Angelo Saporito"
+date: '`r Sys.Date()`'
+output:
+  xaringan::moon_reader:
+    css: xaringan-themer.css
+    nature:
+      slideNumberFormat: "%current%"
+      highlightStyle: github
+      highlightLines: true
+      ratio: 16:9
+      countIncrementalSlides: true
+---
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE)
+if (!require("knitr")) {
+   install.packages("knitr")
+   library(knitr)
+}
+if (!require("pander")) {
+   install.packages("pander")
+   library(pander)
+}
+if (!require("plotly")) {
+   install.packages("plotly")
+   library(plotly)
+}
+if (!require("ggplot2")) {
+   install.packages("ggplot2")
+   library(ggplot2)
+}
+knitr::opts_chunk$set(
+                  fig.width=3, 
+                  fig.height=3, 
+                  fig.retina=12,
+                  out.width = "100%",
+                  cache = FALSE,
+                  echo = TRUE,
+                  message = FALSE, 
+                  warning = FALSE,
+                  hiline = TRUE
+                  )
+```
+
+
+```{r xaringan-themer, include=FALSE, warning=FALSE}
+library(xaringanthemer)
+  style_duo_accent(primary_color = "#1F4257",
+                   secondary_color = "white",
+          # fonts
+          header_font_google = google_font("Martel"),
+          text_font_google = google_font("Lato"),
+          code_font_google = google_font("Fira Mono"))
+```
+
+class:inverse4, top
+
+<h1 align="center"> Overview</h1>
+
+.pull-left[
+- Agenda and Contents
+
+   - Gain a sense of familiarity with the data by analyzing its structure and nuances
+   - Analyze the research questions presented using various similarity and dissimilarity measures
+      - Chi-Squared test and $\phi$-coefficient
+      
+    - Use multiple unsupervised machine learning algorithms to cluster the data:
+      - K-modes clustering for categorical data
+      - Multiple Correspondence Analysis (MCA) 
+          - Analysis of dimensions and components
+          - Individual clustering 
+]
+
+.pull-right[
+- We are researching various characteristics of U.S. veterans living abroad. Some research questions include:
+
+   - Is there a relationship between why an expatriated veteran moved abroad and why they might repatriate?
+   
+   - Is there a relationship between why a veteran might repatriate and where/how they access medical care? And their employment status?
+   
+   - Is there a relationship between why a veteran expatriated and their first year of active service?
+   
+   - Is there a relationship between where they veteran expatriated to (location) and their age/first year of active service?
+]
+
+---
+
+class: inverse1
+
+<h1 align="center"> Data Exploration</h1>
+
+
+```{r  echo=FALSE}
+expat_data <- readxl::read_xlsx("C:/Users/Angelo/OneDrive/Desktop/College Babyyyyyyy/RESEARCH/Prof Kelly F/final_data.xlsx") 
+
+table_data <- expat_data %>%
+  select(Whyab01,Whyab02, Whyab03, Retus01, Retus02, dec_first_enlist, Rank, Locate)
+
+DT::datatable(table_data[10:16,], fillContainer = FALSE, options = list(pageLength = 4), rownames = FALSE)
+```
+
+- This is a subset of our data. Our full dataset contains 160 observations and 39 variables ranging from demographic data, socioeconomic data, data on reason for expatriation and (possible) repatriation, medical access data, VA benefit data, etc.
+
+- We will explore the relationship between a specific subset of data within the next sections.
+---
+
+class: inverse1
+
+<h2 align="center"> Research Question and Methods of Analysis</h2>
+
+#### Relationship between *expatriation* and *repatriation*?
+
+- We are interested in the first research question: is there a relationship between why a veteran moved abroad *vis-à-vis* why they may repatriate to the U.S.
+    - If there is a relationship between specific variables, there may be a story to be told, i.e., if there is a relationship between expatriating due to financial burden and repatriating due to medical care.
+    
+#### We will test the relationship using two different methods:
+
+.pull-left[
+1. Chi-Squared test: a statistical test used to determine whether there is a significant association between two categorical variables.
+
+    - $\chi^2 = \sum \frac{(O_i-E_i)^2}{E_i}$, where $O_i=$ observed value and $E_i=$ expected value.
+]
+
+.pull-right[
+1. $\phi$-coefficient: a measure of association between two binary variables in a contingency table.
+
+    - $\phi = \frac{(AD-BC)}{\sqrt{(A+B)(C+D)(A+C)(B+D)}}$, 
+    
+    where A,B,C,D are the frequencies of the four possible outcomes in a 2×2 contingency table.
+
+]
+
+---
+
+class: inverse1
+
+<h2 align="center"> Test Output and Analysis: Chi-Squared Test</h2>
+
+.pull-center[
+```{r warning=FALSE, echo=FALSE, out.width = '200px', fig.align='left'}
+# Create vectors of column names for moved abroad and return
+moved_abroad_vars <- names(expat_data)[1:6]
+return_vars <- names(expat_data)[9:15]
+
+# Perform pairwise chi-square tests
+results <- matrix(NA, nrow = length(moved_abroad_vars), ncol = length(return_vars),
+                  dimnames = list(moved_abroad_vars, return_vars))
+
+for (i in 1:length(moved_abroad_vars)) {
+  for (j in 1:length(return_vars)) {
+    # Perform chi-square test for each pair of variables
+    chi_sq_result <- chisq.test(expat_data[[moved_abroad_vars[i]]], expat_data[[return_vars[j]]])
+    # Store the p-value in the results matrix
+    results[i, j] <- chi_sq_result$p.value
+  }
+}
+kable(results) %>%
+  kableExtra::kable_styling(full_width = FALSE, font_size = 16)
+```
+]
+
+.pull-left[
+#### Interpretation of Significant Results
+- Whyab02 ("I have closer personal ties") and Retus01 ("Family ties"): This result suggests that individuals who originally expatriated from the US due to having closer personal ties are more likely to consider returning because of family ties.
+
+- Whyab01 ("I have closer business ties") and Retus07 ("Nothing"): This result suggests that individuals who
+]
+
+.pull-right[
+- initially left the US due to business-related reasons might not find compelling reasons to return, indicating that their current situation is satisfactory enough to deter any desire to return to the US.
+
+- Whyab05 ("To avoid the politics of the US") and Retus06 ("Patriotism"): This finding suggests that some individuals who left the US to avoid political and policy-related reasons might consider returning due to a sense of patriotism. 
+]
+
+---
+class: inverse1
+
+<h2 align="center"> Test Output and Analysis: $\phi$-coefficient</h2>
+.pull-center[
+```{r warning=FALSE, echo=FALSE, out.width = '200px', fig.align='left'}
+# Load necessary packages
+library(vcd)
+
+# Create a matrix to store phi coefficients
+phi_matrix <- matrix(NA, nrow = length(moved_abroad_vars), ncol = length(return_vars),
+                  dimnames = list(moved_abroad_vars, return_vars))
+
+# Calculate phi coefficients for each pair of variables
+for (i in 1:length(moved_abroad_vars)) {
+  for (j in 1:length(return_vars)) {
+    # Create contingency table for each pair of variables
+    contingency_table <- table(expat_data[[moved_abroad_vars[i]]], expat_data[[return_vars[j]]])
+    # Compute phi coefficient and store in the matrix
+    phi_matrix[i, j] <- assocstats(contingency_table)$phi
+  }
+}
+
+# Print the phi coefficient table
+kable(phi_matrix) %>%
+  kableExtra::kable_styling(full_width = FALSE, font_size = 16)
+```
+]
+
+.pull-left[
+#### Phi-coefficient Interpretation
+
+The phi coefficient, also known as the phi correlation coefficient, measures the association between two binary variables. It ranges from -1 to 1, where:
+ - 1: both variables are perfectly related and move in the same direction.
+ - 0: the variables are independent of each other.
+ - -1: both variables are perfectly related but move in opposite directions.
+]
+
+.pull-right[
+
+1. There is approximately a 19 percent correlation between expatriating due to personal ties and repatriating due to familial ties.
+
+2. There is approximately a 19.5 percent correlation between expatriating due to business ties and possessing no reasons to repatriate.
+
+3. There is approximately a 20 percent correlation between expatriating to avoid U.S. politics and repatriating due to patriotism.
+]
+
+---
+class: inverse1
+<h2 align="center">K-Modes Clustering</h2>
+.pull-left[
+```{r warning=FALSE, echo=FALSE}
+cluster_data <- as.data.frame(lapply(expat_data, as.factor))
+
+results <- klaR::kmodes(cluster_data, 17, iter.max = 100)
+
+table <- cbind(cluster_data, results$cluster)
+```
+
+```{r echo=FALSE, warning=FALSE, fig.height=3, fig.width=5}
+par(mar = c(.5, 5, 2, 2))
+cluster::clusplot(cluster_data, results$cluster, color = TRUE, shade = TRUE, 
+                 labels = FALSE, lines = 0, main = "Clusters of Expat Veterans", xlab = "", ylab = "", sub = "")
+```
+- Unlike k-means, which calculates cluster centers as the mean of numeric attributes, k-modes uses modes (most frequent values) for categorical attributes.
+- It assigns each data point to the cluster whose mode is most similar to it with the goal to minimize the dissimilarity within clusters.
+]
+
+.pull-right[
+Let's denote:
+- $X=\{x_1, x_2,...,x_n\}$ as the dataset, where each $x_i$ is a categorical data point with $m$ dimensions.
+- $C=\{c_1,c_2,...,c_k\}$ as the set of cluster modes, where $c_j$ represents the most frequent category (mode) of cluster $j$.
+
+The k-modes algorithm:
+1. Initialize $k$ cluster modes $c_1, c_2,..., c_k$
+  based on the dissimilarity measure.
+2. Assign each $x_i$ to the nearest cluster mode $c_j$ based on the dissimilarity (distance) measure.
+3. Update each cluster mode $c_j$ by selecting the mode of the data points assigned to cluster $j$.
+4. Repeat the assignment and update steps until convergence criteria are met.
+]
+
+---
+class: inverse1
+<h2 align="center">Multiple Correspondence Analysis (MCA)</h2>
+
+.pull-left[
+```{r echo=FALSE, warning=FALSE, include=FALSE}
+library(factoextra)
+library(FactoMineR)
+library(plotly)
+
+expat_mca <- MCA(cluster_data,
+    ncp = 5,
+    graph = TRUE)
+# Generate the MCA plot without numerical indices on points
+mca_plot <- fviz_mca_ind(
+  expat_mca, 
+  col.ind = "cos2", 
+  gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+  repel = TRUE, 
+  ggtheme = theme_minimal(),
+  legend = "none",
+  label = "none"  # Remove numerical indices from points
+)
+
+x_coords <- mca_plot$data$x
+y_coords <- mca_plot$data$y
+grad <- mca_plot$data$cos2
+
+# Generate numerical indices
+indices <- seq_len(length(x_coords))
+
+# Create a data frame with x, y, and indices
+scaled_grad <- (grad - min(grad)) / (max(grad) - min(grad))
+
+# Convert scaled_grad to a factor with levels from 0 to 1
+mca_plot$data$cos2 <- cut(scaled_grad, breaks = 5, labels = FALSE)
+```
+
+```{r echo=FALSE, warning=FALSE, out.width="100%", out.height="70%"}
+# Convert the plot to a plotly object
+plot_ly(mca_plot$data, x = ~x, y = ~y, text=indices , type = "scatter", mode = "markers", color = ~cos2, 
+        colors = c("#8BBDD9","#5BA4CF","#298FCA","#0079BF","#026AA7"), opacity = grad) %>%
+  layout(title = "Individuals - MCA",
+         xaxis = list(title = "Component 1 (8.9%)"),
+         yaxis = list(title = "Component 2 (4.6%)"))
+```
+]
+
+.pull-right[
+- MCA takes a dataset consisting of categorical variables and represents it in a lower-dimensional space.
+
+- MCA provides insights into the relationships between categories of different variables and identifies patterns of association between categories. 
+
+- cos2 (Squared Cosine) is a measure of the quality of representation of categories on the dimensions obtained from MCA (this is our *coloring* or *gradient*).
+
+- cos2 values range between 0 and 1, where 0 indicates that the category is poorly represented on the dimension, and 1 indicates perfect representation.
+    - Higher values of cos2 indicate that the category is well-represented on the dimension and contributes more to the variability explained by that dimension.
+]
+
+---
+class: inverse1
+<h2 align="center">Components: K-Modes and MCA</h2>
+
+.pull-left[
+```{r echo=FALSE, warning=FALSE, out.height="80%", out.width="80%"}
+library("factoextra")
+eig.val <- get_eigenvalue(expat_mca)
+
+fviz_screeplot(expat_mca, addlabels = TRUE, ylim = c(0, 10), ncp=5)
+```
+]
+
+.pull-right[
+#### Explanation of Components
+
+- MCA, similar to K-Modes, constructs a set of synthetic variables, called dimensions or components, which capture the underlying structure of the categorical data.
+
+- Components in MCA are constructed based on the association between categories of different variables. These components are linear combinations of the original variables and represent patterns of association in the data.
+
+- In our case, 8.9% of the variability in the whole dataset is explained by Component 1, 4.6% in Component 2, and 13.5% woth Components 1 and 2.
+]
+
+---
+class: inverse1
+<h2 align="center">References</h2>
+
+- [Husson, F., Josse, J., & Mazet, J. (n.d.). MCA: Multiple Correspondence Analysis (MCA). RDocumentation. https://www.rdocumentation.org/packages/FactoMineR/versions/2.9/topics/MCA](https://www.rdocumentation.org/packages/FactoMineR/versions/2.9/topics/MCA) 
+
+- [Huang, Z. (1997) A Fast Clustering Algorithm to Cluster Very Large Categorical Data Sets in Data Mining. in KDD: Techniques and Applications (H. Lu, H. Motoda and H. Luu, Eds.), pp. 21-34, World Scientific, Singapore.](https://vladestivill-castro.net/teaching/kdd.d/readings.d/huang97fast.pdf)
+
+- [Kassambara. (2017, September 24). MCA - multiple correspondence analysis in R: Essentials. STHDA. http://sthda.com/english/articles/31-principal-component-methods-in-r-practical-guide/114-mca-multiple-correspondence-analysis-in-r-essentials](http://sthda.com/english/articles/31-principal-component-methods-in-r-practical-guide/114-mca-multiple-correspondence-analysis-in-r-essentials)
+
+- [Neumann, C., & Szepannek, G. K-modes clustering. RDocumentation. https://search.r-project.org/CRAN/refmans/klaR/html/kmodes.html](https://search.r-project.org/CRAN/refmans/klaR/html/kmodes.html)
+
